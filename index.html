@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Yunlumi · 云路觅 — 唤醒星宿的光</title>
+    <meta name="description" content="Yunlumi：在云海之上的夜空里化身一缕光，沿云路收集流光，点亮星宿，唤醒五只粒子灵兽。WASD + 鼠标的三维粒子飞行游戏。" />
+    <meta name="theme-color" content="#05060f" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+    <!-- Pinned dependency: three.js r170 (ES module) from jsDelivr. See README for self-hosting. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="c" tabindex="0" aria-label="Yunlumi 游戏画面"></canvas>
+
+    <!-- ===================== HUD ===================== -->
+    <div id="hud" class="hidden">
+      <div id="hud-tl" class="panel">
+        <div class="light-row">
+          <span class="lbl">光</span><span id="light" class="low">0</span>
+        </div>
+        <div class="bar" title="疾飞能量（Shift）"><i id="boost"></i></div>
+        <div class="skills">
+          <div id="sk-pulse" class="sk"><i></i>绽光<b>左键/E</b></div>
+          <div id="sk-dash" class="sk"><i></i>冲刺<b>右键/Q</b></div>
+        </div>
+      </div>
+      <div id="hud-tc">
+        <div id="night"><div id="night-fill"></div><span id="time">4:00</span></div>
+        <div id="score">0</div>
+      </div>
+      <div id="hud-tr" class="panel">
+        <div id="consts"></div>
+        <div id="lanterns">月灯 0/7</div>
+      </div>
+      <div id="cross"></div>
+      <div id="combo"></div>
+      <div id="prompt"></div>
+      <div id="floats"></div>
+      <div id="guide" class="indicator"><div class="arrow"></div><span id="guide-label"></span></div>
+      <div id="shoot-guide" class="indicator shoot"><div class="arrow"></div><span></span></div>
+      <div id="banner"><h2></h2><p></p></div>
+      <div id="hint"></div>
+      <div id="edge">云路尽头 · 请回头</div>
+      <div id="vignette"></div>
+      <div id="fps"></div>
+    </div>
+
+    <!-- ===================== MENU ===================== -->
+    <div id="menu" class="overlay">
+      <div class="card">
+        <h1><span class="en">YUNLUMI</span><span class="zh">云 路 觅</span></h1>
+        <p class="tag">
+          云海之上，群星沉睡。你是一缕名叫 <b>Lumi</b> 的光——<br />
+          沿着云路收集流光，点亮五座星宿，在天亮之前唤醒它们的灵兽。
+        </p>
+        <button id="btn-start" class="primary">点击起飞</button>
+        <div id="menu-best" class="best"></div>
+        <div class="cols">
+          <div class="controls">
+            <h3>操控</h3>
+            <ul>
+              <li><kbd>鼠标</kbd> 转向（自动锁定指针）</li>
+              <li><kbd>W</kbd><kbd>S</kbd> 前进 / 减速后退　<kbd>A</kbd><kbd>D</kbd> 横移</li>
+              <li><kbd>空格</kbd><kbd>C</kbd> 上升 / 下降　<kbd>Shift</kbd> 疾飞</li>
+              <li><kbd>左键</kbd>/<kbd>E</kbd> 绽光：消耗光，驱散周围墨魇</li>
+              <li><kbd>右键</kbd>/<kbd>Q</kbd> 冲刺：穿透击散墨魇</li>
+              <li><kbd>P</kbd>/<kbd>Esc</kbd> 暂停　<kbd>M</kbd> 静音　<kbd>`</kbd> 帧率</li>
+            </ul>
+          </div>
+          <div class="rules">
+            <h3>玩法</h3>
+            <ol>
+              <li>沿发光云路吸收光点，穿越<b>风环</b>加速、叠连击</li>
+              <li>带着 <b>8 光</b>穿过沉睡的星辰将它点亮</li>
+              <li>点亮整座星宿 → <b>灵兽苏醒</b>、永久强化、夜晚延长</li>
+              <li>躲开或驱散偷光的<b>墨魇</b>；追上<b>流星</b>；寻找藏起来的<b>月灯</b></li>
+              <li>天亮前唤醒全部五灵，见证终幕奇观</li>
+            </ol>
+          </div>
+        </div>
+        <div class="opts">
+          <label>画质
+            <select id="opt-quality">
+              <option value="auto">自动</option>
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
+            </select>
+          </label>
+          <label>鼠标灵敏度 <input id="opt-sens" type="range" min="0.3" max="2.5" step="0.05" /></label>
+          <label><input id="opt-invert" type="checkbox" /> 反转 Y 轴</label>
+          <button id="opt-mute" class="ghost">声音：开</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== PAUSE ===================== -->
+    <div id="pause" class="overlay hidden">
+      <div class="card small">
+        <h2>暂停</h2>
+        <p class="tag">夜色为你停驻。</p>
+        <button id="btn-resume" class="primary">继续飞行</button>
+        <div class="row">
+          <button id="btn-restart" class="ghost">重新开始 (R)</button>
+          <button id="btn-menu" class="ghost">回到标题</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== RESULTS ===================== -->
+    <div id="results" class="overlay hidden">
+      <div class="card small">
+        <h2 id="res-title">云路尽明</h2>
+        <p id="res-sub" class="tag"></p>
+        <div class="rank-row"><div id="res-rank" class="rank">A</div><div><div id="res-score" class="res-score">0</div><div id="res-best" class="best"></div></div></div>
+        <div id="res-stats" class="stats"></div>
+        <div class="row">
+          <button id="btn-again" class="primary">再飞一次 (R)</button>
+          <button id="btn-res-menu" class="ghost">回到标题</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="lock-msg"></div>
+
+    <div id="error" class="overlay hidden">
+      <div class="card small">
+        <h2>无法启动</h2>
+        <p class="tag"></p>
+      </div>
+    </div>
+
+    <script>
+      // Boot watchdog: explains failures instead of leaving a black screen.
+      (function () {
+        function fail(msg) {
+          var e = document.getElementById('error');
+          if (!e) return;
+          e.querySelector('p').textContent = msg;
+          e.classList.remove('hidden');
+          var m = document.getElementById('menu');
+          if (m) m.classList.add('hidden');
+        }
+        window.addEventListener('error', function (ev) {
+          if (window.__yunlumiBooted) return;
+          var t = ev && ev.target;
+          if (t && t !== window && (t.src || t.href)) fail('资源加载失败：' + (t.src || t.href) + '（需要联网访问 cdn.jsdelivr.net 获取 three.js）');
+          else if (ev && ev.message) fail('启动出错：' + ev.message);
+        }, true);
+        window.addEventListener('unhandledrejection', function (ev) {
+          if (!window.__yunlumiBooted) fail('启动出错：' + (ev.reason && ev.reason.message ? ev.reason.message : ev.reason));
+        });
+        setTimeout(function () {
+          if (!window.__yunlumiBooted)
+            fail('游戏未能启动。请确认可以访问 cdn.jsdelivr.net（three.js 依赖），并使用支持 WebGL2 与 ES Module 的现代浏览器。');
+        }, 15000);
+      })();
+    </script>
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
